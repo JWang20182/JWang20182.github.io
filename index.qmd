@@ -1,0 +1,29 @@
+---
+about:
+  template: jolla
+  id: about-block
+  image: "img/my_photo.jpg"
+  links:
+    - icon: linkedin
+      text: LinkedIn
+      href: https://www.linkedin.com/in/jing-wang-5099bb25/
+    - icon: envelope
+      text: Email
+      href: "mailto:jxw445@case.edu"  
+---
+
+::: {#about-block}
+:::
+
+# Welcome to my website!
+
+I am Jing Wang, a lab manager at Case Western Reserve University. My professional journey has been driven by a passion for addressing scientific questions that contribute to improved healthcare outcomes. The focus of my current project is to identify blood biomarkers for stroke.
+
+Please feel free to [contact me](mailto:jxw445@case.edu) if you have any questions or would like to discuss potential projects.
+
+```{=html}
+<div  style="margin: 30px; text-align: center;">
+<a class="btn btn-primary" href="https://www.marvinschmitt.com/blog/website-tutorial-quarto/" role="button" target="_blank" style="padding: 15px 30px;">View the tutorial for this template (+ download link)</a>
+</div>
+```
+

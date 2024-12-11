@@ -1,0 +1,660 @@
+---
+title: "Data Analysis of Blood Pressure"
+author: "Jing Wang"
+date: last-modified
+format: 
+    dashboard:
+        orientation: columns
+        date-format: iso
+css: styles.scss
+---
+
+```{r}
+#| label: load-packages
+#| message: false
+
+
+#library(nhanesA)
+library(dplyr)
+library(janitor)
+library(knitr)
+library(bslib)
+library(plotly)
+library(broom)
+library(scales)
+library(patchwork) 
+library(DT)
+library(car)
+library(GGally)
+library(equatiomatic)
+library(tidyverse)
+
+theme_set(theme_light())
+
+knitr::opts_chunk$set(comment=NA)
+```
+
+```{r eval = TRUE, echo = FALSE, results = "hide"}
+#ingest and load the raw data
+
+#demographic data
+#demo_raw <- nhanes('P_DEMO') %>% tibble()
+#saveRDS(demo_raw, "data/P_DEMO.Rds")
+#bood pressure
+#bpxo_raw <- nhanes('P_BPXO') %>% tibble()
+#saveRDS(bpxo_raw, "data/P_BPXO.Rds")
+#Glycohemoglobin
+#ghb_raw <- nhanes('P_GHB') %>% tibble()
+#saveRDS(ghb_raw, "data/P_GHB.Rds")
+
+
+#load each data set in a tibble
+demo_raw <- readRDS("data/P_DEMO.Rds")
+bpxo_raw <- readRDS("data/P_BPXO.Rds")
+bpq_raw <- readRDS("data/P_BPQ.Rds")
+ghb_raw <- readRDS("data/P_GHB.Rds")
+
+#merge the tibbles
+raw_data <- reduce(list(demo_raw, bpxo_raw, ghb_raw), left_join, by = "SEQN")
+```
+
+```{r eval = TRUE, echo = FALSE, results = "hide"}
+#clean the data
+#20<age<80, complete cases for blood pressure and cholesterol
+dat <- raw_data %>%
+    filter(RIDSTATR == "Both interviewed and MEC examined", RIDAGEYR > 20, RIDAGEYR < 80) %>%
+    select(SEQN, BPXOSY1, BPXODI1, LBXGH, RIAGENDR, RIDAGEYR) %>%
+    filter(complete.cases(.)) %>%
+    rename(SysBP = BPXOSY1,
+           DiaBP = BPXODI1, 
+           HbA1c = LBXGH, 
+           Gender = RIAGENDR, 
+           Age = RIDAGEYR)
+
+saveRDS(dat, "data/dat.Rds")
+```
+
+
+
+
+```{r eval = TRUE, echo = FALSE, results = "hide"}
+#load data
+
+dat <- readRDS("data/dat.Rds")
+
+```
+
+
+# {.sidebar}
+
+```{r}
+value_box(
+    title = "Data Source",
+    value = "NHANES 2017 - March 2020 ",
+    showcase = bsicons::bs_icon("book"),
+    theme = "light", 
+    showcase_layout = "top right"
+)
+```
+
+
+```{r}
+value_box(
+    title = "Total Subjects ",
+    value = dim(dat)[1],
+    showcase = bsicons::bs_icon("person-standing"),
+    theme_color = "info", 
+    showcase_layout = "top right"
+)
+```
+
+```{r}
+value_box(
+    title = "Variables",
+    value = dim(dat)[2],
+    showcase = bsicons::bs_icon("gear"),
+    theme_color = "secondary", 
+    showcase_layout = "top right"
+)
+```
+
+
+
+# Data Summaries
+
+## Column {width="50%" .tabset}
+
+```{r}
+#| title: Systolic Blood Pressure 
+
+p1 <- ggplot(dat, aes(x = SysBP)) +
+    geom_histogram(binwidth = 10, fill = "#C3B1E1", col = "white") +
+    stat_function(fun = function(x) {
+    dnorm(x, mean = mean(dat$SysBP, na.rm = TRUE),
+          sd = sd(dat$SysBP, na.rm = TRUE) ) *length(dat$SysBP) * 10}, 
+          geom = "area", alpha = 0.5, fill = "#F8C8DC", col = "black") +
+    labs(x ="Systolic Blood Pressure", y="count")
+
+p2 <- ggplot(dat, aes(sample = SysBP)) + 
+    geom_qq(col = "#C3B1E1") + geom_qq_line(col = "red") + 
+    labs(x = "Theoretical Quantiles", y="Sample Quantiles")
+
+p3 <- ggplot(dat, aes(x = "", y = SysBP)) +
+    geom_violin(fill = "#C3B1E1", alpha = 0.3) + 
+    geom_boxplot(fill = "#C3B1E1", width = 0.3) +
+    stat_summary(position = position_dodge(0.9), fun = mean, geom = "point", size = 2, col = "red") +
+    labs(x = "", y ="Systolic Blood Pressure") + coord_flip()
+
+p1 + p2 - p3 +
+  plot_layout(ncol = 1, height = c(3, 2)) + 
+  plot_annotation(title = "Systolic Blood Pressure (mmHg)",
+         subtitle = paste0(nrow(dat), " subjects"))
+
+```
+
+```{r}
+#| title: Diastolic Blood Pressure 
+
+p1 <- ggplot(dat, aes(x = DiaBP)) +
+    geom_histogram(binwidth = 10, fill = "#A7C7E7", col = "white") +
+    stat_function(fun = function(x) {
+    dnorm(x, mean = mean(dat$DiaBP, na.rm = TRUE),
+          sd = sd(dat$DiaBP, na.rm = TRUE) ) *length(dat$DiaBP) * 10}, 
+          geom = "area", alpha = 0.5, fill = "#C1E1C1", col = "black") +
+    labs(x ="Diastolic Blood Pressure", y="count")
+
+p2 <- ggplot(dat, aes(sample = DiaBP)) + 
+    geom_qq(col = "#A7C7E7") + geom_qq_line(col = "red") + 
+    labs(x = "Theoretical Quantiles", y="Sample Quantiles")
+
+p3 <- ggplot(dat, aes(x = "", y = DiaBP)) +
+    geom_violin(fill = "#A7C7E7", alpha = 0.3) + 
+    geom_boxplot(fill = "#A7C7E7", width = 0.3) +
+    stat_summary(position = position_dodge(0.9), fun = mean, geom = "point", size = 2, col = "red") +
+    labs(x = "", y ="Diastolic Blood Pressure") + coord_flip()
+
+p1 + p2 - p3 +
+  plot_layout(ncol = 1, height = c(3, 2)) + 
+  plot_annotation(title = "Diastolic Blood Pressure (mmHg)",
+         subtitle = paste0(nrow(dat), " subjects"))
+```
+
+
+
+
+## Column {width="50%"}
+
+### Row {height="30%"}
+
+```{r}
+#| title: Gender
+
+p2_1 <-dat %>% 
+    mutate(Gender = fct_relevel(Gender, "Female")) %>%
+    count(Gender) %>% 
+    ggplot(aes(x = n, y = "", fill = Gender)) +
+    geom_col(position = "fill", color = "white") +
+    scale_fill_brewer(palette = "Pastel1") +  # Use Pastel1 palette
+    scale_x_continuous(labels = scales::label_percent()) +
+    labs(y = NULL, x = NULL, fill = "Gender") +
+    theme_minimal()
+ggplotly(p2_1)
+```
+
+### Row {height="70%" .tabset}
+
+```{r}
+#| title: Distribution of Glycohemoglobin
+
+p1 <- ggplot(dat, aes(x = HbA1c)) +
+    geom_histogram(binwidth = 0.5, fill = "#C3B1E1", col = "white") +
+    stat_function(fun = function(x) {
+    dnorm(x, mean = mean(dat$HbA1c, na.rm = TRUE),
+          sd = sd(dat$HbA1c, na.rm = TRUE) ) *length(dat$HbA1c) * 0.001}, 
+          geom = "area", alpha = 0.5, fill = "#C1E1C1", col = "black") +
+    labs(x ="HbA1c", y="count")
+
+p2 <- ggplot(dat, aes(sample = HbA1c)) + 
+    geom_qq(col = "#C3B1E1") + geom_qq_line(col = "red") + 
+    labs(x = "Theoretical Quantiles", y="Sample Quantiles")
+
+p3 <- ggplot(dat, aes(x = "", y =  HbA1c)) +
+    geom_violin(fill = "#C3B1E1", alpha = 0.3) + 
+    geom_boxplot(fill = "#C3B1E1", width = 0.3) +
+    stat_summary(position = position_dodge(0.9), fun = mean, geom = "point", size = 2, col = "red") +
+    labs(x = "", y ="HbA1c") + coord_flip()
+
+p1 + p2 - p3 +
+  plot_layout(ncol = 1, height = c(3, 2)) + 
+  plot_annotation(title = "Glycohemoglobin (HbA1c, %)",
+         subtitle = paste0(nrow(dat), " subjects"))
+
+```
+
+
+```{r}
+#| title: Distribution of Age
+
+p1 <- ggplot(dat, aes(x = Age)) +
+    geom_histogram(binwidth = 5, fill = "#A7C7E7", col = "white") +
+    stat_function(fun = function(x) {
+    dnorm(x, mean = mean(dat$Age, na.rm = TRUE),
+          sd = sd(dat$Age, na.rm = TRUE) ) *length(dat$Age) * 0.001}, 
+          geom = "area", alpha = 0.5, fill = "#F8C8DC", col = "black") +
+    labs(x ="Age", y="count")
+
+p2 <- ggplot(dat, aes(sample = Age)) + 
+    geom_qq(col = "#A7C7E7") + geom_qq_line(col = "red") + 
+    labs(x = "Theoretical Quantiles", y="Sample Quantiles")
+
+p3 <- ggplot(dat, aes(x = "", y =  Age)) +
+    geom_violin(fill = "#A7C7E7", alpha = 0.3) + 
+    geom_boxplot(fill = "#A7C7E7", width = 0.3) +
+    stat_summary(position = position_dodge(0.9), fun = mean, geom = "point", size = 2, col = "red") +
+    labs(x = "", y ="Age") + coord_flip()
+
+p1 + p2 - p3 +
+  plot_layout(ncol = 1, height = c(3, 2)) + 
+  plot_annotation(title = "Age (Years)", 
+                           subtitle = paste0(nrow(dat), " subjects"))
+
+```
+
+
+
+# Build Linear Models 
+
+## {.tabset}
+
+### Data Partition and Outcome Transformation
+
+#### Row {height=30%}
+
+
+```{r}
+#partition the dataset
+
+set.seed(2024)
+train_data <-dat %>% slice_sample(prop=0.75, replace=FALSE)
+test_data <- anti_join(dat, train_data, by="SEQN")
+#dim(train_data)
+#dim(test_data)
+```
+
+::: {.card}
+
+
+Sample Set  | Subjects | % of Total Sample 
+:--------: | :----: | :-----------: 
+Training sample | 5064 | 75%
+Test Sample | 1688 | 25%
+:::
+
+
+```{r}
+#| results: hide
+
+#im <- lm(SysBP ~ DiaBP+HbA1c+Chol+BMI+HealthCond+Age+Gender, data = dat)
+#boxCox(im)
+
+```
+
+What does Box-Cox suggest about transformation?
+
+![Box-Cox](data/boxcox.png){width=45%}
+
+
+
+
+
+#### Row {width="70%"}
+
+```{r}
+#| label: Distribution of Systolic Blood Pressure in Training Sample
+p1 <- ggplot(train_data, aes(x = SysBP)) +
+    geom_histogram(binwidth = 10, fill = "#C1E1C1", col = "white") +
+    stat_function(fun = function(x) {
+    dnorm(x, mean = mean(train_data$SysBP, na.rm = TRUE),
+          sd = sd(train_data$SysBP, na.rm = TRUE) ) *length(train_data$SysBP) * 10}, 
+          geom = "area", alpha = 0.5, fill = "#A7C7E7", col = "black") +
+    labs(x ="Systolic Blood Pressure", y="count")
+
+p2 <- ggplot(train_data, aes(sample = SysBP)) + 
+    geom_qq(col = "#C1E1C1") + geom_qq_line(col = "red") + 
+    labs(x = "Theoretical Quantiles", y="Sample Quantiles")
+
+p3 <- ggplot(train_data, aes(x = "", y = SysBP)) +
+    geom_violin(fill = "#C1E1C1", alpha = 0.3) + 
+    geom_boxplot(fill = "#C1E1C1", width = 0.3) +
+    stat_summary(position = position_dodge(0.9), fun = mean, geom = "point", size = 2, col = "red") +
+    labs(x = "", y ="Systolic Blood Pressure") + coord_flip()
+
+p1 + p2 - p3 +
+  plot_layout(ncol = 1, height = c(3, 2)) + 
+  plot_annotation(title = "Systolic Blood Pressure (mmHg)",
+         subtitle = paste0("Model Development Sample: ", 
+                           nrow(train_data), 
+                           " subjects"))
+```
+
+
+```{r}
+#| label: Reciprocal Transformation of Systolic Blood Pressure in Training Sample
+
+p1 <- ggplot(train_data, aes(x = 1/SysBP)) +
+    geom_histogram(binwidth = 0.001, fill = "#C3B1E1", col = "white") +
+    stat_function(fun = function(x) {
+    dnorm(x, mean = mean(1/train_data$SysBP, na.rm = TRUE),
+          sd = sd(1/train_data$SysBP, na.rm = TRUE) ) *length(1/train_data$SysBP) * 0.001}, 
+          geom = "area", alpha = 0.5, fill = "#F8C8DC", col = "black") +
+    labs(x ="Inverse of Systolic Blood Pressure", y="count")
+
+p2 <- ggplot(train_data, aes(sample =  1/SysBP)) + 
+    geom_qq(col = "#C3B1E1") + geom_qq_line(col = "red") + 
+    labs(x = "Theoretical Quantiles", y="Sample Quantiles")
+
+p3 <- ggplot(train_data, aes(x = "", y =  1/SysBP)) +
+    geom_violin(fill = "#C3B1E1", alpha = 0.3) + 
+    geom_boxplot(fill = "#C3B1E1", width = 0.3) +
+    stat_summary(position = position_dodge(0.9), fun = mean, geom = "point", size = 2, col = "red") +
+    labs(x = "", y ="Inverse of Systolic Blood Pressure") + coord_flip()
+
+p1 + p2 - p3 +
+  plot_layout(ncol = 1, height = c(3, 2)) + 
+  plot_annotation(title = "Reciprocal Transformation of Systolic Blood Pressure",
+         subtitle = paste0("Model Development Sample: ", 
+                           nrow(train_data), 
+                           " subjects"))
+
+```
+
+### Scatterplot Matrix of Training sample
+
+```{r, echo = FALSE}
+# make scatterplot matrix
+train_data %>% 
+  mutate("1/SysBP" = 1/SysBP) %>%
+  select("1/SysBP", DiaBP, HbA1c, Age, Gender) %>%
+  ggpairs(., 
+    title = "Scatterplots: Model Development Sample",
+    lower = list(combo = wrap("facethist", bins = 10)))
+```
+
+### Linear Models 
+```{r}
+# build linear models
+m1 <- lm(1/SysBP ~ DiaBP, data = train_data)
+m2 <- lm(1/SysBP ~ DiaBP+Age, data = train_data)
+m3 <- lm(1/SysBP ~ DiaBP+Age+HbA1c, data = train_data)
+m4 <- lm(1/SysBP ~ DiaBP+Age+HbA1c+Gender, data = train_data)
+```
+
+
+#### row
+
+##### column {width=45%}
+
+
+```{r eval = TRUE, echo = FALSE, results = "hide"}
+
+extract_eq(m1, use_coefs=TRUE, coef_digits=8,
+           ital_vars=TRUE, wrap=TRUE, terms_per_line=3)
+```
+
+:::{.card}
+Model 1
+$$
+\begin{aligned}
+\widehat{1/SysBP} &= 0.0134 - 0.000068(DiaBP)
+\end{aligned}
+$$
+:::
+
+##### column {width=55%}
+
+```{r}
+# coefficients
+tidy(m1, conf.int=TRUE, conf.level=0.90) %>% 
+    select(term, estimate, std.error, p.value, conf.low, conf.high) %>% 
+    kable(digits=6)
+```
+
+#### row
+
+##### column {width=45%}
+
+```{r eval = TRUE, echo = FALSE, results = "hide"}
+
+
+extract_eq(m2, use_coefs=TRUE, coef_digits=4,
+           ital_vars=TRUE, wrap=TRUE, terms_per_line=3)
+```
+
+:::{.card}
+Model 2
+$$
+\begin{aligned}
+\widehat{1/SysBP} &= 0.0146 - 0.000066(DiaBP) - 0.000027(Age)
+\end{aligned}
+$$
+:::
+
+##### column {width=55%}
+
+```{r}
+# coefficients
+tidy(m2, conf.int=TRUE, conf.level=0.90) %>% 
+    select(term, estimate, std.error, p.value, conf.low, conf.high) %>% 
+    kable(digits=6)
+```
+
+#### row
+
+##### column {width=45%}
+
+```{r eval = TRUE, echo = FALSE, results = "hide"}
+extract_eq(m3, use_coefs=TRUE, coef_digits=4,
+           ital_vars=TRUE, wrap=TRUE, terms_per_line=3)
+```
+
+:::{.card}
+Model 3
+$$
+\begin{aligned}
+\widehat{1/SysBP} &= 0.0147 - 0.000066(DiaBP) - 0.000026(Age) \\
+&\quad - 0.000035(HbA1c)
+\end{aligned}
+$$
+:::
+
+##### column {width=55%}
+
+```{r}
+# coefficients
+tidy(m3, conf.int=TRUE, conf.level=0.90) %>% 
+    select(term, estimate, std.error, p.value, conf.low, conf.high) %>% 
+    kable(digits=6)
+```
+
+#### row
+
+##### column {width=45%}
+
+```{r eval = TRUE, echo = FALSE, results = "hide"}
+
+
+extract_eq(m4, use_coefs=TRUE, coef_digits=4,
+           ital_vars=TRUE, wrap=TRUE, terms_per_line=3)
+```
+
+:::{.card}
+Model 4
+$$
+\begin{aligned}
+\widehat{1/SysBP} &= 0.0145 - 0.000065(DiaBP) - 0.000026(Age) \\
+&\quad - 0.000029(HbA1c) + 0.000304(Gender_{Female})
+\end{aligned}
+$$
+:::
+
+##### column {width=55%}
+
+```{r}
+# coefficients
+tidy(m4, conf.int=TRUE, conf.level=0.90) %>% 
+    select(term, estimate, std.error, p.value, conf.low, conf.high) %>% 
+    kable(digits=6)
+```
+
+
+# Check Linear Models
+
+## {.tabset}
+
+
+### In-sample Fit Quality
+
+
+```{r}
+
+# make a table for fit quality metrics
+
+bind_rows(glance(m1), glance(m2), glance(m3), glance(m4)) %>%
+    mutate(model_vars=c("Model 1 DiaBP", "Model 2 +Age", "Model 3 +HbA1c", "Model 4 +Gender")) %>%
+    select(model_vars, r2=r.squared, adj_r2=adj.r.squared, sigma, AIC, BIC) %>% 
+    kable(digits=c(0,4,4,5,1,1))
+```
+
+
+```{r}
+# ANOVA of linear models
+
+anova(m1,m2,m3,m4)
+```
+
+### Check Regression Assumptions {.tabset}
+
+#### Model 1
+
+
+```{r}
+#| title: 1/SysBP ~ DiaBP
+par(mfrow = c(2,2)); plot(m1); par(mfrow = c(1,1))
+
+```
+
+
+#### Model 2
+
+```{r}
+#| title: 1/SysBP ~ DiaBP + Age
+
+par(mfrow = c(2,2)); plot(m2); par(mfrow = c(1,1))
+
+```
+
+
+#### Model 3
+
+```{r}
+#| title: 1/SysBP ~ DiaBP + Age + HbA1c
+
+par(mfrow = c(2,2)); plot(m3); par(mfrow = c(1,1))
+
+```
+
+
+#### Model 4
+
+
+```{r}
+#| title: 1/SysBP ~ DiaBP + Age + HbA1c + Gender
+
+par(mfrow = c(2,2)); plot(m4); par(mfrow = c(1,1))
+
+```
+
+
+### Check Collinearity of Predictors
+
+
+#### Row
+
+
+
+```{r}
+#| title: Model 2 - 1/SysBP ~ DiaBP + Age
+
+vif(m2)
+```
+
+#### Row
+
+
+
+```{r}
+#| title: Model 3 - 1/SysBP ~ DiaBP + Age + HbA1c
+
+vif(m3)
+```
+
+#### Row 
+
+
+```{r}
+#| title: Model 4 - 1/SysBP ~ DiaBP + Age + HbA1c + Gender
+
+vif(m4)
+```
+
+### Prediction Errors
+
+
+```{r}
+#residuals of predictions
+
+test_m1 <- augment(m1, newdata = test_data) %>% mutate(inv_sys=1/SysBP) %>%
+    mutate(model = "Model 1", fit_sBP=1/.fitted, res_sBP=SysBP-fit_sBP)
+test_m2 <- augment(m2, newdata = test_data) %>% mutate(inv_sys=1/SysBP)%>%
+    mutate(model = "Model 2", fit_sBP=1/.fitted, res_sBP=SysBP-fit_sBP)
+test_m3 <- augment(m3, newdata = test_data) %>% mutate(inv_sys=1/SysBP)%>%
+    mutate(model = "Model 3", fit_sBP=1/.fitted, res_sBP=SysBP-fit_sBP)
+test_m4 <- augment(m4, newdata = test_data) %>% mutate(inv_sys=1/SysBP)%>%
+    mutate(model = "Model 4", fit_sBP=1/.fitted, res_sBP=SysBP-fit_sBP)
+
+test_comp <- bind_rows(test_m1, test_m2, test_m3, test_m4) %>% arrange(model)
+
+#prediction errors
+test_comp %>% group_by(model) %>% 
+    summarize(n=n(),
+              MAPE=mean(abs(res_sBP)),
+              RMSPE=sqrt(mean(res_sBP^2)),
+              max_error=max(abs(res_sBP)),
+              Median_APE=median(abs(res_sBP))) %>%
+    kable(digits = c(0,0,3,3,3,3))
+```
+
+
+
+
+# Data
+
+## Column 
+
+### Row {height=10%}
+
+:::{.card}
+The original data is from [NHANES 2017-March 2020 Pre-pandemic](https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?Cycle=2017-2020).
+:::
+
+### Row {height=90%}
+
+```{r}
+#data table
+dat %>%
+  arrange(SEQN) %>%
+  datatable(
+    colnames = c("Seqn", "Systolic Blood Pressure (mmHg)", "Diastoclic Blood Pressure (mmHg)", "Glycohemoglobin (%)", "Gender", "Age (Years)"),
+    options = list(dom = 'ftp', paging = TRUE)
+    )
+```
