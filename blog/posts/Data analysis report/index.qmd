@@ -1,0 +1,152 @@
+---
+title: "A Report for Data Analysis of Blood Pressure"
+author: "Jing Wang"
+date: last-modified
+categories: [analysis]
+format: 
+  html:
+    toc: true
+    number-sections: true
+    embed-resources: true
+    date-format: iso
+---
+
+# Hypothesis
+
+The hypothesis I am testing is: **Systolic blood pressure is associated with one or more of the following factors: diastolic blood pressure, glycohemoglobin, age, and gender.**
+
+# Data Analysis and Build the Dashboard
+
+The dashboard is based on Dashboard Example 1 from the intruction webpage.
+
+## Data Ingestion and Cleaning
+
+To test the hypothesis, I download `P_DEMO` (including age and gender information), `P_BPXO` (including systolic and diastolic blood pressure), and `P_GHB` (including glycohemoglobin data) from NHANES 2017 - March 2020 Pre-pandemic data using the `nhanes` package. The data is first saved as Rds individually, then load into R as tibbles, and merge into a raw data tibble.
+
+The raw data is filtered to include subjects aged 21 to 79 years old, as I want to analyze data from adults. Subjects listed with an age of 80 are removed, as this category is a catch-all for all subjects aged 80 and older. Only SEQN and the selected outcome and predictor variables are retained from the raw data, and then subjects with complete cases for the selected variables are filtered. The column names of the tibble are changed to more descriptive names, and the tibble is saved as an Rds file for easier data loading and analysis.
+
+### Dashboard for This Part
+
+A sidebar is created with three value boxes to show the data source, the number of subjects, and the number of variables. A `Data` page containing the cleaned data and a link to the NHANES data source is built for the viewers to check the data.
+
+## Data Summaries
+
+The `Seqn` variable is used for subject identification; all the analysis will be focused on the other 5 variables.
+
+To have a brief idea of what each variable looks like, data summaries are made in the form of plots. For each numerical variable, a histogram, a QQ-Norm plot, and a boxplot with violin, are made. These plots show the data distribution, the mean and the quantiles, as well as outliers. It is also easy to determine whether data follows a normal distribution. A bar chart is provided for `Gender` variable.
+
+`SysBP` is right-skewed with outliers in the right tail. The range is from 70 to 220 mmHg, with the mean (125 mmHg) bigger than the median. The distribution is not normal.
+
+`diaBP` very slightly right-skewed, probably due to the outliers in the right tail. The range is from 40 to 140 mmHg, with both the mean and the median close to 75 mmHg. The distribution is almost normal except for the outliers on the right.
+
+`HbA1c` is right-skewed with a lot of outliers on the right. The range is from 3% to 16%, while the majority of data is between 4% to 9%. The mean is bigger than the median.
+
+`Age` ranges from 21 to 79 years, with an even distribution between 22 and 50 years. The mode occurs at 60 years, and the distribution tapers off at both younger and older ages. The mean is 50 years and the median is 51 years.
+
+The female and male subjects each make up about 50% of the total sample, with slightly more female subjects.
+
+### Dashboard for This Part
+
+A `Data Summaries` page is created to display the summaries. The page is divided into two columns: the first column contains a tab set with two tabs, one for systolic blood pressure and the other for diastolic blood pressure; the second column has a narrow row for `Gender` and a wider row with a tab set containing one tab for each of `HbA1c` and `Age`.
+
+## Build Linear Models
+
+To test the hypothesis, `SysBP` is to be treated as outcome, `diaBP`, `HbA1c`, `Age`, and `Gender` will be treated as predictors.
+
+### Develop Training and Test Samples for Analysis
+
+A random sample of 75% of the data is selected for model training, and the remaining 25% is hold out for model testing. For reproducibility, use `set.seed` when partitioning the data.
+
+### Develop Candidate Models Using the Training Sample
+
+Study the outcome variable `SysBP` in the training sample to consider whether a transformation might be in order.
+
+Like in the data summaries section, a histogram overlayed with a normal distribution, a QQ-Norm plot, and a boxplot with violin is created using `SysBP` in the training sample. The data distribution of SysBP is obviously right skewed and deviates from the normal distribution.
+
+Box-Cox suggests a transformation with a $\lambda$ at about -0.8, to make the transformation easier to comprehend. I decide to use a inverse transformation, which is close to the Box-Cox suggestion. The same three plots are created for `1/SysBP`, and now it can be approximated to a normal distribution. The transformation of outcome variable is in an attempt to help make the linear regression assumptions of linearity, normality and constant variance more appropriate.
+
+A scatterplot matrix is made by `ggpairs`. `1/SysBP` is put first. In the plots from the first column, it is obvious that `DiaBP` has a stronger correlation to `1/SysBP` than the other two numerical variables. In the information from the first row, it is observed that the correlation coefficient of `DiaBP` is highest and that of `HbA1c` is lowest among the variables. There is a slight difference of `1/SysBP` between the two genders.
+
+### Fit Regression Models
+
+Use `lm` to fit regression models with different numbers of prediction variables. Get the coefficients, standard error, P value, and 90% confidence interval for each model with `tidy.`
+
+`Model 1` uses `DiaBP` as the only predictor, since the outcome is inverse transformed, the estimated coefficient is a small negative number, so are the higher and lower bounds of the confidence interval. Since the confidence interval does not include 0, there is a negative association between `1/SysBP` and `DiaBP`, when the outcome variable is transformed back, the correlation is positive.
+
+`Model 2` uses `DiaBP` and `Age` as predictors. Estimated coefficient and its confidence interval are negative for both predictors, indicating a positive correlation between both predictors and the original outcome.
+
+`Model 3` uses `DiaBP`, `Age` and `HbA1c` as predictors. Estimated coefficient and its confidence interval are negative for all predictors, indicating a positive correlation between all predictors and the original outcome.
+
+`Model 4` uses `DiaBP`, `Age`, `HbA1c` and `Gender` as predictors. Estimated coefficient and its confidence interval are negative for all numerical predictors, indicating a positive correlation between these predictors and the original outcome; estimated coefficient and its confidence interval are positive for `Gender`, indicating the mean `SysBP` of female subjects is lower than that of male subjects.
+
+### Dashboard for This Part
+
+A page is built for this part with three tabs, one for each subsection.
+
+In the `Data Partition and Outcome Transformation` tab, there are two columns. In the first column, The top panel displays a table of the split samples, and the bottom panel shows the plots for `SysBP` in the training sample. In the second column, the top panel displays the Box-Cox plot, and the bottom panel shows the plots for transformed outcome variable in the training sample. The comparison of the two lower panels indicates that the transformation helps the data to become more normally distributed.
+
+In the second tab, the scatterplot matrix is created for all variables involved in the analysis.
+
+In `Linear Models` tab, four linear models are built. Each row has the regression equation of the model on the left, and a table of coefficients on the right.
+
+## Check Linear Models
+
+Multiple aspects of the models are checked.
+
+### In Sample Fit Quality
+
+R^2^, adjusted R^2^, sigma, Akaike Information Criterion (AIC) and Bayesian Information Criterion (BIC) are checked for in sample fit quality. R^2^ measures the proportion of variance explained by the model. Adjusted R^2^ accounts for the number of predictors to prevent overfitting. Sigma estimates the residual standard error, reflecting the model's accuracy. AIC evaluates model quality, balancing goodness of fit and complexity. BIC assesses model fit with a stronger penalty for additional predictors. The information is obtained using `glance`.
+
+The results indicate that `Model 4` performs the best overall. It has the highest R^2^ (0.5879) and adjusted R^2^ (0.5876), suggesting that it best explains variability in `1/SysBP` without overfitting among all four models; its lowest sigma (0.00077), AIC (-58223.8) and BIC (-58184.7) indicate the best accuracy among the four models. `Models 2` and `Model 3` perform similarly, with slight differences R^2^, AIC and BIC. `Model 1` has the worst fit quality among the four.
+
+An Analysis of Variance (ANOVA) table comparing four models is created by `anova`. The RSS decreases with each added predictor, indicating an improvement in the model's ability to explain variability in `1/SysBP`. The small P values, which are less than 0.05 for each additional variable, suggesting that every additional variable in these four models is a meaningful predictor of `1/SysBP`.
+
+### Check Regression Assumptions
+
+The regression assumptions of linearity, homoscedasticity, and normality are checked by four residual plots.
+
+The plot of Residuals vs Fitted shows linearity in all four models. `Model 1` exhibits a funnel shape, indicating non-constant variance in the residuals, while the other three models meet the homoscedasticity assumption.
+
+The plot of Scale-Location looks good for all models.
+
+Plots of Q-Q Residuals and Residuals vs Leverage look good for all four models except for a few outliers.
+
+All four predictors are independent, and none of them depend on another predictor.
+
+### Check Collinearity of Predictors
+
+Use `vif` to check the collinearity of predictors. All VIFs are about 1, indicating no collinearity between the predictors.
+
+### Prediction Errors
+
+Prediction is carried out using the test sample. `augment` and mathematical methods are used to obtain mean absolute percentage error (MAPE), root mean square percentage error (RMSPE), max error, and median absolute prediction error for each model.
+
+The results indicate that `Model 4` performs the best overall, with the lowest MAPE (9.536%), RMSPE (13.150%), max error (72.78), and median absolute prediction error (7.260), suggesting it provides more accurate and consistent predictions compared to the other models. `Models 2` and `Model 3` perform similarly, with slight differences in RMSPE and max error. `Model 1` has the highest error metrics, indicating the lowest predictive accuracy among the four.
+
+### Dashboard for This Part
+
+A page is created for this part with four tabs, one for each subsection.
+
+In the `In-sample Fit Quality` page, the top panel is a table of R^2^, adjusted R^2^, sigma, AIC, and BIC for four models, the bottom panel is the ANOVA table comparing four models. It is easy to see that `Model 4` is the best fitting model with the highest R^2^ and adjust R^2^, and lowest sigma, AIC and BIC.
+
+The `Check Regression Assumptions` page has four tabs, one for each model. There are four plots in each tab to help check linearity, homoscedasticity, and normality.
+
+The `Check Collinearity of Predictors` tab uses VIF to check the collinearity, there is no concern of collinearity.
+
+In `Prediction Errors` tab, prediction is made, and MAPE, RMSPE, max error and median absolute prediction error of all four models are listed. It is easy to see that `Model 4` performs the best overall, with lowest errors.
+
+# Conclusion
+
+In this analysis, the hypothesis, that systolic blood pressure (`SysBP`) is associated with one or more of the following factors: diastolic blood pressure (`DiaBP`), glycohemoglobin (`HbA1c`), age, and gender, is tested. The analysis involved data cleaning, exploratory data analysis, and the development of linear regression models to evaluate the relationships between the outcome variable and the selected predictors.
+
+The results suggest that `SysBP` is indeed influenced by the examined factors. Specifically, the regression models indicated a positive association between `SysBP` and `DiaBP`, age and `HbA1c.` Furthermore, gender was found to be a meaningful predictor, with female subjects showing lower mean `SysBP` values compared to male subjects.
+
+Among the models tested, `Model 4`, which included all four predictors (`DiaBP`, `Age`, `HbA1c`, and `Gender`), performed the best in terms of in-sample fit quality, predictive accuracy, and error metrics. It explained the greatest amount of variability in `SysBP` and had the lowest prediction errors, making it the most reliable model for forecasting `SysBP`. The equation for `Model 4` is:
+
+$$
+\text{SysBP} = \frac{1}{0.0145 - 0.000065 \cdot (\text{DiaBP}) - 0.000026 \cdot (\text{Age}) - 0.000029 \cdot (\text{HbA1c}) + 0.000304 \cdot (\text{Gender}_{\text{Female}})}
+$$
+
+The analysis also met key assumptions of linear regression, with the exception of some homoscedasticity issues in Model 1, which included only `DiaBP` as a predictor. However, the overall regression assumptions of linearity, homoscedasticity, and normality were generally satisfied across the models with more predictors.
+
+In conclusion, the hypothesis that systolic blood pressure is associated with all evaluated factors — diastolic blood pressure, age, glycohemoglobin, and gender — was supported by the data.
